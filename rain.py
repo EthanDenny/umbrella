@@ -2,6 +2,7 @@ from blessed import Terminal
 import time
 import random
 import os
+import keyboard
 
 try:
     from colorama import just_fix_windows_console
@@ -32,11 +33,11 @@ class Umbrella:
         self.width = text.index('\n')
         self.text = text.replace('\n', '')
         self.height = int(len(self.text) / self.width)
-        self.pos = (0, 0)
+        self.pos = [0, 0]
     
     def center(self):
         update_size()
-        self.pos = ((screen_width - self.width) // 2 - 2, 20 - self.height)
+        self.pos = [(screen_width - self.width) // 2 - 2, 20 - self.height]
 
 
 def echo(buffer):
@@ -54,6 +55,21 @@ def load_umbrella():
         umbrella = Umbrella(''.join(lines[:-1]))
         umbrella.center()
         umbrella_credit = lines[-1]
+
+
+def move_umbrella(x=0, y=0):
+    umbrella.pos[0] += x
+    umbrella.pos[1] += y
+    
+    if umbrella.pos[0] < 0:
+        umbrella.pos[0] = 0
+    if umbrella.pos[0] >= screen_width - umbrella.width:
+        umbrella.pos[0] = screen_width - umbrella.width
+    
+    if umbrella.pos[1] < 0:
+        umbrella.pos[1] = 0
+    if umbrella.pos[1] >= screen_height - umbrella.height - 1:
+        umbrella.pos[1] = screen_height - umbrella.height - 1
 
 
 def update_size():
@@ -126,4 +142,9 @@ def main():
             
 
 if __name__ == '__main__':
+    keyboard.add_hotkey('up', lambda: move_umbrella(y=-1))
+    keyboard.add_hotkey('down', lambda: move_umbrella(y=1))
+    keyboard.add_hotkey('left', lambda: move_umbrella(x=-1))
+    keyboard.add_hotkey('right', lambda: move_umbrella(x=1))
+
     main()
