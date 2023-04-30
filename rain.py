@@ -1,6 +1,7 @@
 from blessed import Terminal
 import time
 import random
+import os
 
 try:
     from colorama import just_fix_windows_console
@@ -8,99 +9,120 @@ try:
 except Exception:
     pass
 
+
+SPAWN_SPEED = 4
+RAIN_SPEED = 75
+LIGHTNING_CHANCE = 250
+LIGHTNING_TIME = 10
+
+term = Terminal()
+
+screen_width = 1
+screen_height = 1
+
 drops = []
 lightning = 0
 
-term = Terminal()
+umbrella = None
+umbrella_credit = ''
+
+
+class Umbrella:
+    def __init__(self, text):
+        self.width = text.index('\n')
+        self.text = text.replace('\n', '')
+        self.height = int(len(self.text) / self.width)
+        self.pos = (0, 0)
+    
+    def center(self):
+        update_size()
+        self.pos = ((screen_width - self.width) // 2 - 2, 20 - self.height)
+
 
 def echo(buffer):
     if lightning > 0:
         buffer = term.black_on_white(buffer)
     print(buffer, end='', flush=True)
 
-def clear():
-    echo(term.home + term.clear)
 
-width = 120
-height = 30
-speed = 75
+def load_umbrella():
+    global umbrella
+    global umbrella_credit
 
-class Umbrella:
-    def __init__(self, text):
-        row_length = text[1:].index('\n')
-        self.text = text.replace('\n', '') + ' '
-        self.size = (row_length, int(len(self.text) / row_length))
-        self.pos = ((width - self.size[0]) // 2 - 2, 20 - self.size[1])
+    with open('umbrella.txt') as f:
+        lines = list(f)
+        umbrella = Umbrella(''.join(lines[:-1]))
+        umbrella.center()
+        umbrella_credit = lines[-1]
 
-umbrella = Umbrella("""
-XXXXXXXX__.|.__XXXXXXXX
-XXXX.n887.d8`qb`"-.XXXX
-XX.d88' .888  q8b. `.XX
-Xd8P'  .8888   .88b. \X
-d88_._ d8888_.._9888 _\\
-  '   '    |    '   '  
-           |           
-           |           
-           |           
-           |           
-           |           
-         `='           """)
+
+def update_size():
+    global screen_width
+    global screen_height
+
+    size = os.get_terminal_size()
+    screen_width = size.columns
+    screen_height = size.lines
 
 
 def main():
     global lightning
 
+    load_umbrella()
+
     with term.fullscreen(), term.cbreak(), term.hidden_cursor():
         while True:
+            # Update internal screen size
+            update_size()
+
             # Spawn drops
-            for _ in range(4):
-                drops.append([random.randrange(width), 0])
+            for _ in range(SPAWN_SPEED):
+                drops.append([random.randrange(screen_width), 0])
             
             # Handle lightning
             lightning -= 1
-            if lightning < 0 and random.randrange(250) == 0:
-                lightning = 10
-
-            # Clear screen
-            clear()
+            if lightning < 0 and random.randrange(LIGHTNING_CHANCE) == 0:
+                lightning = LIGHTNING_TIME
 
             # Create start string
-            s = (' ' * width) * (height - 1) + '-' * width
+            s = (' ' * screen_width) * (screen_height - 1) + '-' * screen_width
 
             # Draw drops
             for drop in drops:
-                pos = drop[1] * width + drop[0]
-                if drop[1] < height - 1:
+                pos = drop[1] * screen_width + drop[0]
+                if drop[1] < screen_height - 1:
                     s = s[:pos] + '|' + s[pos+1:]
-                elif drop[1] == height - 1:
+                elif drop[1] == screen_height - 1:
                     s = s[:pos] + '*' + s[pos+1:]
             
             # Move and destroy drops
             for drop in drops:
                 drop[1] += 1
-                if drop[1] >= height:
+                if drop[1] >= screen_height:
                     drops.remove(drop)
                 x = umbrella.pos[0]
                 y = umbrella.pos[1]
-                if x <= drop[0] < x + umbrella.size[0] and drop[1] > y + 4:
-                    drops.remove(drop)
+                if x <= drop[0] < x + umbrella.width and drop[1] > y + 4:
+                    if drop in drops:
+                        drops.remove(drop)
             
             # Print umbrella
-            for x in range(umbrella.size[0]):
-                for y in range(umbrella.size[1]):
-                    if umbrella.text[x+y*umbrella.size[0]] != 'X':
-                        pos = (umbrella.pos[1] + y) * width + (umbrella.pos[0] + x)
-                        s = s[:pos] + umbrella.text[x+y*umbrella.size[0]] + s[pos+1:]
+            for x in range(umbrella.width):
+                for y in range(umbrella.height):
+                    string_pos = x+y*umbrella.width
+                    global_pos = (umbrella.pos[1] + y) * screen_width + (umbrella.pos[0] + x)
+
+                    if umbrella.text[string_pos] != 'X':
+                        s = s[:global_pos] + umbrella.text[string_pos] + s[global_pos+1:]
             
-            # Add credits
-            credit = 'Umbrella by mh'
-            s = credit + s[len(credit):]
+            # Add umbrella_credit
+            s = umbrella_credit + s[len(umbrella_credit):]
 
             # Output
-            echo(s)
+            echo(term.home + term.clear + s)
 
             # Wait
-            time.sleep(1.0 / speed)
+            time.sleep(1.0 / RAIN_SPEED)
             
 
 if __name__ == '__main__':
